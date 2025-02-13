@@ -48,9 +48,9 @@
  #define BOTAO_A         5    // Botão A
  
  // Pinos dos LEDs RGB
- #define LED_RED         11
- #define LED_GREEN       12
- #define LED_BLUE        13
+ #define LED_RED         13
+ #define LED_GREEN       11
+ #define LED_BLUE        12
  
  // Botão B para o modo BOOTSEL
  #define BOOTSEL_BUTTON  6

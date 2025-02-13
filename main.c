@@ -40,6 +40,8 @@
  #define I2C_SDA         14
  #define I2C_SCL         15
  #define SSD1306_ADDR    0x3C
+ #define WIDTH           128
+ #define HEIGHT          64
  
  // Pinos do Joystick e Botões
  #define JOYSTICK_X_PIN  26   // ADC: canal 0 (GPIO26)
@@ -48,9 +50,10 @@
  #define BOTAO_A         5    // Botão A
  
  // Pinos dos LEDs RGB
- #define LED_RED         13
- #define LED_GREEN       11
- #define LED_BLUE        12
+ #define LED_GREEN 11
+ #define LED_BLUE  12
+ #define LED_RED   13
+
  
  // Botão B para o modo BOOTSEL
  #define BOOTSEL_BUTTON  6
@@ -58,83 +61,64 @@
  // Tempo de debounce (ms)
  #define DEBOUNCE_DELAY_MS 200
  
- // PWM: definindo o valor de wrap (12 bits para ficar compatível com ADC 0-4095)
+ // PWM: valor de wrap (12 bits, compatível com o ADC 0-4095)
  #define PWM_WRAP 4095
  
  //==================== Variáveis Globais Voláteis ====================
- // Flag para ativar/desativar os PWM dos LEDs (controlado pelo Botão A)
- volatile bool pwm_enabled = true;
+ volatile bool pwm_enabled = true;     // Controla ativação dos PWM dos LEDs (Botão A)
+ volatile bool green_led_on = false;     // Estado do LED Verde (alternado pelo botão do joystick)
+ volatile uint8_t border_style = 0;      // Alterna o estilo da borda do display (0 ou 1)
  
- // Estado do LED Verde (controlado pelo botão do joystick)
- volatile bool green_led_on = false;
- 
- // Variável para alternar o estilo da borda do display (0 ou 1)
- volatile uint8_t border_style = 0;
- 
- // Variáveis para debouncing dos botões (armazenam o instante do último acionamento)
+ // Variáveis para debouncing dos botões
  static absolute_time_t last_interrupt_time_joystick = {0};
  static absolute_time_t last_interrupt_time_buttonA = {0};
  
  //==================== Rotina de Interrupção para os Botões ====================
- /*
-  * Callback global de interrupção para os botões:
-  * - Se o botão BOOTSEL (GPIO6) for pressionado, entra em modo boot.
-  * - Se o botão do joystick (GPIO22) for pressionado, alterna o LED Verde e o estilo da borda.
-  * - Se o botão A (GPIO5) for pressionado, ativa/desativa os PWM dos LEDs.
-  */
  void gpio_callback(uint gpio, uint32_t events) {
      absolute_time_t now = get_absolute_time();
  
      if (gpio == BOOTSEL_BUTTON) {
          // Botão B: entra em modo BOOTSEL para reprogramação
          reset_usb_boot(0, 0);
-     }
-     else if (gpio == JOYSTICK_PB) {
-         // Debouncing para o botão do joystick
+     } else if (gpio == JOYSTICK_PB) {
+         // Debounce para o botão do joystick
          if (absolute_time_diff_us(last_interrupt_time_joystick, now) < DEBOUNCE_DELAY_MS * 1000)
              return;
          last_interrupt_time_joystick = now;
  
-         // Alterna o estado do LED Verde
+         // Alterna o estado do LED Verde e o estilo da borda
          green_led_on = !green_led_on;
-         // Alterna o estilo da borda do display (0 <-> 1)
          border_style = (border_style + 1) % 2;
-     }
-     else if (gpio == BOTAO_A) {
-         // Debouncing para o botão A
+     } else if (gpio == BOTAO_A) {
+         // Debounce para o botão A
          if (absolute_time_diff_us(last_interrupt_time_buttonA, now) < DEBOUNCE_DELAY_MS * 1000)
              return;
          last_interrupt_time_buttonA = now;
  
-         // Alterna a ativação dos PWM para os LEDs
+         // Alterna a ativação dos PWM dos LEDs
          pwm_enabled = !pwm_enabled;
      }
  }
  
- //==================== Função Principal ====================
+ //==================== Função Principal =====================
  int main() {
-     // Inicializa as funções básicas da SDK
+     // Inicializa as funções básicas (stdio para printf, etc.)
      stdio_init_all();
  
      // -------------- Configuração dos Botões --------------
-     // Botão B para BOOTSEL (GPIO6)
      gpio_init(BOOTSEL_BUTTON);
      gpio_set_dir(BOOTSEL_BUTTON, GPIO_IN);
      gpio_pull_up(BOOTSEL_BUTTON);
  
-     // Botão do Joystick (GPIO22)
      gpio_init(JOYSTICK_PB);
      gpio_set_dir(JOYSTICK_PB, GPIO_IN);
      gpio_pull_up(JOYSTICK_PB);
  
-     // Botão A (GPIO5)
      gpio_init(BOTAO_A);
      gpio_set_dir(BOTAO_A, GPIO_IN);
      gpio_pull_up(BOTAO_A);
  
-     /* Registra o callback de interrupção global para os botões.
-        Ao chamar gpio_set_irq_enabled_with_callback() para o primeiro pino,
-        definimos a função callback que será chamada para todas as interrupções. */
+     // Registra o callback de interrupção para os botões
      gpio_set_irq_enabled_with_callback(BOOTSEL_BUTTON, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
      gpio_set_irq_enabled(JOYSTICK_PB, GPIO_IRQ_EDGE_FALL, true);
      gpio_set_irq_enabled(BOTAO_A, GPIO_IRQ_EDGE_FALL, true);
@@ -180,24 +164,32 @@
      pwm_set_gpio_level(LED_BLUE, 0);
      pwm_set_enabled(slice_blue, true);
  
-     // Variáveis para armazenar as leituras do ADC
+     // Variáveis para as leituras do ADC e cálculo dos PWM
      uint16_t adc_value_x, adc_value_y;
- 
-     // Variáveis para os cálculos do PWM
      uint32_t red_duty, blue_duty, green_duty;
  
-     // Variáveis para a posição do quadrado no display
-     // O quadrado tem 8x8 pixels e o display é 128x64
-     uint8_t square_x, square_y;
+     // Para desenhar o ponteiro: um quadrado de 8x8 pixels
+     int square_width = 8;
+     int square_height = 8;
+     int square_x, square_y;
  
-     // Loop principal
+     /*
+      * Para que o ponteiro fique centralizado, calculamos a posição central do joystick
+      * mapeando os valores do ADC para a resolução do display e, em seguida, subtraindo
+      * metade do tamanho do quadrado. Assim, quando o ADC ler 2047 (centro), teremos:
+      *   pos_center_x = (2047 * 128) / 4095 ≈ 64
+      *   pos_center_y = (2047 * 64)  / 4095 ≈ 32
+      * E o quadrado será desenhado em:
+      *   square_x = 64 - 4 = 60
+      *   square_y = 32 - 4 = 28
+      *
+      * Dessa forma, o centro do quadrado (60+4, 28+4) será (64, 32), que é o centro do display.
+      */
+ 
      while (true) {
          // ------------ Leitura do Joystick via ADC ------------
-         // Seleciona o canal 0 para o eixo X (GPIO26)
          adc_select_input(0);
          adc_value_x = adc_read();
- 
-         // Seleciona o canal 1 para o eixo Y (GPIO27)
          adc_select_input(1);
          adc_value_y = adc_read();
  
@@ -206,55 +198,49 @@
          uint16_t diff_x = (adc_value_x >= 2048) ? (adc_value_x - 2048) : (2048 - adc_value_x);
          uint16_t diff_y = (adc_value_y >= 2048) ? (adc_value_y - 2048) : (2048 - adc_value_y);
  
-         // Mapeia o desvio para o valor de duty cycle (0 a PWM_WRAP)
          red_duty  = ((uint32_t)diff_x * PWM_WRAP) / 2048;
          blue_duty = ((uint32_t)diff_y * PWM_WRAP) / 2048;
- 
-         // Para o LED Verde: se estiver ligado, fica em brilho máximo
          green_duty = green_led_on ? PWM_WRAP : 0;
  
-         // Se os PWM estiverem desativados (botão A), os LEDs permanecem apagados
          if (!pwm_enabled) {
              red_duty = blue_duty = green_duty = 0;
          }
  
-         // Atualiza os níveis PWM nos respectivos pinos
          pwm_set_gpio_level(LED_RED, red_duty);
          pwm_set_gpio_level(LED_GREEN, green_duty);
          pwm_set_gpio_level(LED_BLUE, blue_duty);
  
          // ------------ Atualização do Display SSD1306 ------------
-         // Mapeia os valores do ADC para a posição do quadrado (8x8) no display 128x64.
-         // Considera que (0,0) é o canto superior esquerdo.
-         square_x = (adc_value_x * (128 - 8)) / 4095;
-         square_y = (adc_value_y * (64 - 8)) / 4095;
+         // Mapeia os valores do ADC para a posição do centro do ponteiro no display
+         int pos_center_x = (adc_value_x * WIDTH) / 4095;
+         int pos_center_y = (adc_value_y * HEIGHT) / 4095;
  
-         // Limpa o buffer do display
+         // Calcula a posição do canto superior esquerdo do quadrado, de modo que seu centro fique em (pos_center_x, pos_center_y)
+         square_x = pos_center_x - (square_width / 2);
+         square_y = pos_center_y - (square_height / 2);
+ 
+         // Limita a posição do quadrado para que ele não ultrapasse os limites do display
+         if (square_x < 0) square_x = 0;
+         if (square_x > WIDTH - square_width) square_x = WIDTH - square_width;
+         if (square_y < 0) square_y = 0;
+         if (square_y > HEIGHT - square_height) square_y = HEIGHT - square_height;
+ 
+         // Limpa o buffer do display e desenha a borda
          ssd1306_fill(&ssd, false);
- 
-         // Desenha a borda do display conforme o estilo selecionado
          if (border_style == 0) {
-             // Estilo 0: borda simples ao redor de todo o display
-             ssd1306_rect(&ssd, 0, 0, 128, 64, 1, false);
+             ssd1306_rect(&ssd, 0, 0, WIDTH, HEIGHT, 1, false);
          } else {
-             // Estilo 1: borda dupla (uma externa e outra interna)
-             ssd1306_rect(&ssd, 0, 0, 128, 64, 1, false);
-             ssd1306_rect(&ssd, 2, 2, 124, 60, 1, false);
+             ssd1306_rect(&ssd, 0, 0, WIDTH, HEIGHT, 1, false);
+             ssd1306_rect(&ssd, 2, 2, WIDTH - 4, HEIGHT - 4, 1, false);
          }
  
-         // Desenha o quadrado de 8x8 pixels na posição mapeada
-         ssd1306_rect(&ssd, square_x, square_y, 8, 8, 1, true);
- 
-         // (Opcional) Pode-se exibir informações adicionais, por exemplo, o estado do PWM
-         // Ex: ssd1306_draw_string(&ssd, pwm_enabled ? "PWM ON" : "PWM OFF", 30, 54);
- 
-         // Atualiza o display com os dados do buffer
+         // Desenha o quadrado (ponteiro) na posição calculada
+         ssd1306_rect(&ssd, square_x, square_y, square_width, square_height, 1, true);
          ssd1306_send_data(&ssd);
  
-         // Pequeno delay para estabilizar a leitura e a atualização do display
          sleep_ms(50);
      }
-     
+ 
      return 0;
  }
  

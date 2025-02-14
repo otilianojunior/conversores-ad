@@ -71,7 +71,7 @@ void callback_gpio(uint pino, uint32_t eventos)
             return;
         ultimo_tempo_interrupcao_joystick = agora;
         led_verde_ligado = !led_verde_ligado;
-        estilo_borda = (estilo_borda == 1) ? 2 : 1;
+        estilo_borda = (estilo_borda % 3) + 1;
         printf("[BOTÃO] Bordas: %d | LED Verde: %s\n", estilo_borda, led_verde_ligado ? "Ligado" : "Desligado");
     }
     else if (pino == BOTAO_A)
@@ -250,7 +250,35 @@ int main()
             ssd1306_rect(&oled, 0, 0, LARGURA, ALTURA, 1, false);
             ssd1306_rect(&oled, 1, 1, LARGURA - 2, ALTURA - 2, 1, false);
             ssd1306_rect(&oled, 2, 2, LARGURA - 4, ALTURA - 4, 1, false);
+        } else if (estilo_borda == 3) {
+            // Parâmetros do traço
+            int dash = 4; // tamanho do traço (em pixels)
+            int gap  = 2; // tamanho do intervalo entre traços
+        
+            // Borda superior e inferior
+            for (int x = 0; x < LARGURA; x += dash + gap) {
+                // Borda superior
+                int end_x = (x + dash < LARGURA) ? x + dash : LARGURA;
+                for (int i = x; i < end_x; i++) {
+                    ssd1306_pixel(&oled, i, 0, 1);
+                }
+                // Borda inferior
+                end_x = (x + dash < LARGURA) ? x + dash : LARGURA;
+                for (int i = x; i < end_x; i++) {
+                    ssd1306_pixel(&oled, i, ALTURA - 1, 1);
+                }
+            }
+        
+            // Borda esquerda e direita
+            for (int y = 0; y < ALTURA; y += dash + gap) {
+                int end_y = (y + dash < ALTURA) ? y + dash : ALTURA;
+                for (int j = y; j < end_y; j++) {
+                    ssd1306_pixel(&oled, 0, j, 1);
+                    ssd1306_pixel(&oled, LARGURA - 1, j, 1);
+                }
+            }
         }
+
         // Desenha o quadrado representando a posição do joystick
         ssd1306_rect(&oled, disp_x, disp_y, 8, 8, 1, true);
         ssd1306_send_data(&oled);

@@ -44,8 +44,8 @@
  #define HEIGHT         64
  
  // Pinos do Joystick e Botões
- #define JOYSTICK_X_PIN 26  // ADC: canal 0 (GPIO26)
- #define JOYSTICK_Y_PIN 27  // ADC: canal 1 (GPIO27)
+ #define JOYSTICK_X_PIN 27  // ADC: canal 0 (GPIO26)
+ #define JOYSTICK_Y_PIN 26  // ADC: canal 1 (GPIO27)
  #define JOYSTICK_PB    22  // Botão do Joystick
  #define BOTAO_A        5   // Botão A
  

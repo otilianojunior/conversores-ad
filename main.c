@@ -162,7 +162,7 @@ int main() {
             pos_x += (ajustado_y * 5) / 2048;
         }
         if (abs(ajustado_x) > ZONA_MORTA) {
-            pos_y += (ajustado_x * 5) / 2048;
+            pos_y -= (ajustado_x * 5) / 2048;
         }
 
         // Garante que o quadrado permaneça dentro dos limites do display (8x8)

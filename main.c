@@ -6,7 +6,8 @@
 #include "hardware/pwm.h"
 #include "hardware/irq.h"
 #include "pico/bootrom.h"
-#include "ssd1306.h"    // Ajuste o caminho conforme sua estrutura de pastas
+#include "ssd1306.h"
+
 
 // ==================== Defines ====================
 #define PORTA_I2C           i2c1
@@ -17,7 +18,6 @@
 #define ALTURA              64
 
 // Definições do Joystick e Botões
-// Para o posicionamento correto, use o ADC0 para o eixo X e ADC1 para o eixo Y
 #define PINO_X_JOYSTICK     26    // ADC0
 #define PINO_Y_JOYSTICK     27    // ADC1
 #define BOTAO_JOYSTICK      22    // Botão do joystick

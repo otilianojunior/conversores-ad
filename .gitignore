@@ -1,4 +1,4 @@
 build
 .vscode
-pico_sdk_import.camke
+pico_sdk_import.cmake
 output

@@ -41,8 +41,8 @@
 
 // ==================== Variáveis Globais ====================
 volatile bool pwm_ativado = true;       // Habilita/desabilita os PWM (botão A)
-volatile bool led_verde_ligado = false; // Estado do LED verde (toggle pelo botão do joystick)
-volatile int estilo_borda = 1;          // 1 ou 2, para alternar o estilo da borda
+volatile bool led_verde_ligado = false;   // Estado do LED verde (toggle pelo botão do joystick)
+volatile int estilo_borda = 1;            // 1 ou 2, para alternar o estilo da borda
 
 // Variáveis para debounce via interrupção
 static absolute_time_t ultimo_tempo_interrupcao_joystick = {0};
@@ -147,8 +147,11 @@ int main()
     pwm_set_enabled(slice_verde, true);
 
     // --------- Variáveis para posicionamento do quadrado (8x8) ---------
-    int pos_x = 59; // Posição inicial (interna)
-    int pos_y = 29;
+    // Posições iniciais para o quadrado
+    const int pos_inicial_x = 59; // eixo vertical (pos_x)
+    const int pos_inicial_y = 29; // eixo horizontal (pos_y)
+    int pos_x = pos_inicial_x;
+    int pos_y = pos_inicial_y;
 
     while (true)
     {
@@ -162,14 +165,33 @@ int main()
         int ajustado_x = valor_x - CENTRO_X_JOYSTICK;
         int ajustado_y = valor_y - CENTRO_Y_JOYSTICK;
 
-        // Atualiza a posição (movimento incremental) considerando uma zona morta
+        // Atualiza a posição (movimento incremental) considerando a zona morta
+        // Eixo vertical (influenciado pelo valor de ajustado_y):
         if (abs(ajustado_y) > ZONA_MORTA)
         {
             pos_x += (ajustado_y * 5) / 2048;
         }
+        else
+        {
+            // Se o joystick estiver "solto", retorna gradualmente à posição inicial
+            if (pos_x < pos_inicial_x)
+                pos_x++;
+            else if (pos_x > pos_inicial_x)
+                pos_x--;
+        }
+
+        // Eixo horizontal (influenciado pelo valor de ajustado_x):
         if (abs(ajustado_x) > ZONA_MORTA)
         {
             pos_y -= (ajustado_x * 5) / 2048;
+        }
+        else
+        {
+            // Retorna gradualmente à posição inicial
+            if (pos_y < pos_inicial_y)
+                pos_y++;
+            else if (pos_y > pos_inicial_y)
+                pos_y--;
         }
 
         // Garante que o quadrado permaneça dentro dos limites do display (8x8)
@@ -192,10 +214,16 @@ int main()
         // --------- Atualiza os níveis dos LEDs via PWM ---------
         if (pwm_ativado)
         {
+            // Calcula a intensidade considerando a zona morta:
+            uint32_t valor_y_pwm = (abs(ajustado_x) > ZONA_MORTA) ? (abs(ajustado_x) - ZONA_MORTA) : 0;
+            uint32_t valor_x_pwm = (abs(ajustado_y) > ZONA_MORTA) ? (abs(ajustado_y) - ZONA_MORTA) : 0;
+            // Define o intervalo máximo efetivo (para mapeamento linear)
+            uint32_t max_range = 2048 - ZONA_MORTA;
+
             // LED Vermelho: intensidade proporcional ao desvio horizontal (eixo X)
-            uint32_t duty_azul = ((uint32_t)abs(ajustado_x) * PWM_WRAP) / 2048;
+            uint32_t duty_vermelho = (valor_x_pwm * PWM_WRAP) / max_range;
             // LED Azul: intensidade proporcional ao desvio vertical (eixo Y)
-            uint32_t  duty_vermelho = ((uint32_t)abs(ajustado_y) * PWM_WRAP) / 2048;
+            uint32_t duty_azul = (valor_y_pwm * PWM_WRAP) / max_range;
             // LED Verde: totalmente aceso se estiver ligado (toggle)
             uint32_t duty_verde = led_verde_ligado ? PWM_WRAP : 0;
 
@@ -209,6 +237,7 @@ int main()
             pwm_set_gpio_level(LED_AZUL, 0);
             pwm_set_gpio_level(LED_VERDE, 0);
         }
+
         // --------- Atualiza o display OLED ---------
         ssd1306_fill(&oled, false);
         // Desenha as bordas conforme o estilo selecionado

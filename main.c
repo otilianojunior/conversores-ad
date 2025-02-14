@@ -9,75 +9,75 @@
 #include "ssd1306.h"    // Ajuste o caminho conforme sua estrutura de pastas
 
 // ==================== Defines ====================
-#define I2C_PORT         i2c1
-#define I2C_SDA          14
-#define I2C_SCL          15
-#define SSD1306_ADDR     0x3C
-#define WIDTH            128
-#define HEIGHT           64
+#define PORTA_I2C           i2c1
+#define SDA_I2C             14
+#define SCL_I2C             15
+#define ENDERECO_SSD1306    0x3C
+#define LARGURA             128
+#define ALTURA              64
 
 // Definições do Joystick e Botões
 // Para o posicionamento correto, use o ADC0 para o eixo X e ADC1 para o eixo Y
-#define JOYSTICK_X_PIN   26    // ADC0
-#define JOYSTICK_Y_PIN   27    // ADC1
-#define JOYSTICK_BTN     22    // Botão do joystick
-#define BUTTON_A         5     // Alterna os PWM dos LEDs
-#define BUTTON_B         6     // Botão para entrar em modo BOOTSEL
+#define PINO_X_JOYSTICK     26    // ADC0
+#define PINO_Y_JOYSTICK     27    // ADC1
+#define BOTAO_JOYSTICK      22    // Botão do joystick
+#define BOTAO_A             5     // Alterna os PWM dos LEDs
+#define BOTAO_B             6     // Botão para entrar em modo BOOTSEL
 
 // LEDs RGB (usados via PWM)
-#define LED_GREEN        11
-#define LED_BLUE         12
-#define LED_RED          13
+#define LED_VERDE           11
+#define LED_AZUL            12
+#define LED_VERMELHO        13
 
 // Calibração do joystick e zona morta
-#define JOYSTICK_CENTER_X 1929
-#define JOYSTICK_CENTER_Y 2019
-#define DEADZONE          100
+#define CENTRO_X_JOYSTICK   1929
+#define CENTRO_Y_JOYSTICK   2019
+#define ZONA_MORTA          100
 
 // Valor de wrap do PWM (12 bits)
-#define PWM_WRAP 4095
+#define PWM_WRAP            4095
 
 // Tempo de debounce (ms)
-#define DEBOUNCE_DELAY_MS 200
+#define ATRASO_DEBOUNCE_MS  200
 
 // ==================== Variáveis Globais ====================
-volatile bool pwm_enabled = true;         // Habilita/desabilita os PWM (botão A)
-volatile bool green_led_on = false;         // Estado do LED verde (toggle pelo botão do joystick)
-volatile int border_style = 1;              // 1 ou 2, para alternar o estilo da borda
+volatile bool pwm_ativado = true;         // Habilita/desabilita os PWM (botão A)
+volatile bool led_verde_ligado = false;     // Estado do LED verde (toggle pelo botão do joystick)
+volatile int estilo_borda = 1;              // 1 ou 2, para alternar o estilo da borda
 
 // Variáveis para debounce via interrupção
-static absolute_time_t last_interrupt_time_joystick = {0};
-static absolute_time_t last_interrupt_time_buttonA    = {0};
-static absolute_time_t last_interrupt_time_buttonB    = {0};
+static absolute_time_t ultimo_tempo_interrupcao_joystick = {0};
+static absolute_time_t ultimo_tempo_interrupcao_botaoA    = {0};
+static absolute_time_t ultimo_tempo_interrupcao_botaoB    = {0};
 
 // Objeto do display OLED
-ssd1306_t ssd;
+ssd1306_t oled;
 
 // ==================== Rotina de Interrupção ====================
-void gpio_callback(uint gpio, uint32_t events) {
-    absolute_time_t now = get_absolute_time();
+void callback_gpio(uint pino, uint32_t eventos) {
+    absolute_time_t agora = get_absolute_time();
 
-    if (gpio == BUTTON_B) {
-        if (absolute_time_diff_us(last_interrupt_time_buttonB, now) < DEBOUNCE_DELAY_MS * 1000)
+    if (pino == BOTAO_B) {
+        if (absolute_time_diff_us(ultimo_tempo_interrupcao_botaoB, agora) < ATRASO_DEBOUNCE_MS * 1000)
             return;
-        last_interrupt_time_buttonB = now;
+        ultimo_tempo_interrupcao_botaoB = agora;
         printf("[SISTEMA] Entrando em modo BOOTSEL\n");
         reset_usb_boot(0, 0);
     }
-    else if (gpio == JOYSTICK_BTN) {
-        if (absolute_time_diff_us(last_interrupt_time_joystick, now) < DEBOUNCE_DELAY_MS * 1000)
+    else if (pino == BOTAO_JOYSTICK) {
+        if (absolute_time_diff_us(ultimo_tempo_interrupcao_joystick, agora) < ATRASO_DEBOUNCE_MS * 1000)
             return;
-        last_interrupt_time_joystick = now;
-        green_led_on = !green_led_on;
-        border_style = (border_style == 1) ? 2 : 1;
-        printf("[BOTÃO] Bordas: %d | LED Verde: %s\n", border_style, green_led_on ? "Ligado" : "Desligado");
+        ultimo_tempo_interrupcao_joystick = agora;
+        led_verde_ligado = !led_verde_ligado;
+        estilo_borda = (estilo_borda == 1) ? 2 : 1;
+        printf("[BOTÃO] Bordas: %d | LED Verde: %s\n", estilo_borda, led_verde_ligado ? "Ligado" : "Desligado");
     }
-    else if (gpio == BUTTON_A) {
-        if (absolute_time_diff_us(last_interrupt_time_buttonA, now) < DEBOUNCE_DELAY_MS * 1000)
+    else if (pino == BOTAO_A) {
+        if (absolute_time_diff_us(ultimo_tempo_interrupcao_botaoA, agora) < ATRASO_DEBOUNCE_MS * 1000)
             return;
-        last_interrupt_time_buttonA = now;
-        pwm_enabled = !pwm_enabled;
-        printf("[PWM] Estado: %s\n", pwm_enabled ? "Ativado" : "Desativado");
+        ultimo_tempo_interrupcao_botaoA = agora;
+        pwm_ativado = !pwm_ativado;
+        printf("[PWM] Estado: %s\n", pwm_ativado ? "Ativado" : "Desativado");
     }
 }
 
@@ -86,129 +86,129 @@ int main() {
     stdio_init_all();
 
     // --------- Configuração dos Botões ---------
-    gpio_init(BUTTON_B);
-    gpio_set_dir(BUTTON_B, GPIO_IN);
-    gpio_pull_up(BUTTON_B);
+    gpio_init(BOTAO_B);
+    gpio_set_dir(BOTAO_B, GPIO_IN);
+    gpio_pull_up(BOTAO_B);
 
-    gpio_init(JOYSTICK_BTN);
-    gpio_set_dir(JOYSTICK_BTN, GPIO_IN);
-    gpio_pull_up(JOYSTICK_BTN);
+    gpio_init(BOTAO_JOYSTICK);
+    gpio_set_dir(BOTAO_JOYSTICK, GPIO_IN);
+    gpio_pull_up(BOTAO_JOYSTICK);
 
-    gpio_init(BUTTON_A);
-    gpio_set_dir(BUTTON_A, GPIO_IN);
-    gpio_pull_up(BUTTON_A);
+    gpio_init(BOTAO_A);
+    gpio_set_dir(BOTAO_A, GPIO_IN);
+    gpio_pull_up(BOTAO_A);
 
     // Registra a rotina de interrupção (callback) para os três botões
-    gpio_set_irq_enabled_with_callback(BUTTON_B, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
-    gpio_set_irq_enabled(JOYSTICK_BTN, GPIO_IRQ_EDGE_FALL, true);
-    gpio_set_irq_enabled(BUTTON_A, GPIO_IRQ_EDGE_FALL, true);
+    gpio_set_irq_enabled_with_callback(BOTAO_B, GPIO_IRQ_EDGE_FALL, true, &callback_gpio);
+    gpio_set_irq_enabled(BOTAO_JOYSTICK, GPIO_IRQ_EDGE_FALL, true);
+    gpio_set_irq_enabled(BOTAO_A, GPIO_IRQ_EDGE_FALL, true);
 
     // --------- Configuração do I2C e Display SSD1306 ---------
-    i2c_init(I2C_PORT, 400 * 1000); // 400 kHz
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(I2C_SDA);
-    gpio_pull_up(I2C_SCL);
+    i2c_init(PORTA_I2C, 400 * 1000); // 400 kHz
+    gpio_set_function(SDA_I2C, GPIO_FUNC_I2C);
+    gpio_set_function(SCL_I2C, GPIO_FUNC_I2C);
+    gpio_pull_up(SDA_I2C);
+    gpio_pull_up(SCL_I2C);
 
-    ssd1306_init(&ssd, WIDTH, HEIGHT, false, SSD1306_ADDR, I2C_PORT);
-    ssd1306_config(&ssd);
-    ssd1306_fill(&ssd, false);
-    ssd1306_send_data(&ssd);
+    ssd1306_init(&oled, LARGURA, ALTURA, false, ENDERECO_SSD1306, PORTA_I2C);
+    ssd1306_config(&oled);
+    ssd1306_fill(&oled, false);
+    ssd1306_send_data(&oled);
 
     // --------- Inicialização do ADC para o Joystick ---------
     adc_init();
-    adc_gpio_init(JOYSTICK_X_PIN); // ADC0 para eixo X
-    adc_gpio_init(JOYSTICK_Y_PIN); // ADC1 para eixo Y
+    adc_gpio_init(PINO_X_JOYSTICK); // ADC0 para eixo X
+    adc_gpio_init(PINO_Y_JOYSTICK); // ADC1 para eixo Y
 
     // --------- Configuração do PWM para os LEDs RGB ---------
     // LED Vermelho
-    gpio_set_function(LED_RED, GPIO_FUNC_PWM);
-    uint slice_red = pwm_gpio_to_slice_num(LED_RED);
-    pwm_set_wrap(slice_red, PWM_WRAP);
-    pwm_set_gpio_level(LED_RED, 0);
-    pwm_set_enabled(slice_red, true);
+    gpio_set_function(LED_VERMELHO, GPIO_FUNC_PWM);
+    uint slice_vermelho = pwm_gpio_to_slice_num(LED_VERMELHO);
+    pwm_set_wrap(slice_vermelho, PWM_WRAP);
+    pwm_set_gpio_level(LED_VERMELHO, 0);
+    pwm_set_enabled(slice_vermelho, true);
 
     // LED Azul
-    gpio_set_function(LED_BLUE, GPIO_FUNC_PWM);
-    uint slice_blue = pwm_gpio_to_slice_num(LED_BLUE);
-    pwm_set_wrap(slice_blue, PWM_WRAP);
-    pwm_set_gpio_level(LED_BLUE, 0);
-    pwm_set_enabled(slice_blue, true);
+    gpio_set_function(LED_AZUL, GPIO_FUNC_PWM);
+    uint slice_azul = pwm_gpio_to_slice_num(LED_AZUL);
+    pwm_set_wrap(slice_azul, PWM_WRAP);
+    pwm_set_gpio_level(LED_AZUL, 0);
+    pwm_set_enabled(slice_azul, true);
 
     // LED Verde
-    gpio_set_function(LED_GREEN, GPIO_FUNC_PWM);
-    uint slice_green = pwm_gpio_to_slice_num(LED_GREEN);
-    pwm_set_wrap(slice_green, PWM_WRAP);
-    pwm_set_gpio_level(LED_GREEN, 0);
-    pwm_set_enabled(slice_green, true);
+    gpio_set_function(LED_VERDE, GPIO_FUNC_PWM);
+    uint slice_verde = pwm_gpio_to_slice_num(LED_VERDE);
+    pwm_set_wrap(slice_verde, PWM_WRAP);
+    pwm_set_gpio_level(LED_VERDE, 0);
+    pwm_set_enabled(slice_verde, true);
 
     // --------- Variáveis para posicionamento do quadrado (8x8) ---------
-    int x_pos = 59; // Posição inicial (interna)
-    int y_pos = 29;
+    int pos_x = 59; // Posição inicial (interna)
+    int pos_y = 29;
 
     while (true) {
         // Leitura dos valores ADC do joystick
         adc_select_input(0); // Eixo X
-        uint16_t x_val = adc_read();
+        uint16_t valor_x = adc_read();
         adc_select_input(1); // Eixo Y
-        uint16_t y_val = adc_read();
+        uint16_t valor_y = adc_read();
 
         // Calcula os desvios a partir do centro (calibração)
-        int adjusted_x = x_val - JOYSTICK_CENTER_X;
-        int adjusted_y = y_val - JOYSTICK_CENTER_Y;
+        int ajustado_x = valor_x - CENTRO_X_JOYSTICK;
+        int ajustado_y = valor_y - CENTRO_Y_JOYSTICK;
 
         // Atualiza a posição (movimento incremental) considerando uma zona morta
-        if (abs(adjusted_y) > DEADZONE) {
-            x_pos += (adjusted_y * 5) / 2048;
+        if (abs(ajustado_y) > ZONA_MORTA) {
+            pos_x += (ajustado_y * 5) / 2048;
         }
-        if (abs(adjusted_x) > DEADZONE) {
-            y_pos += (adjusted_x * 5) / 2048;
+        if (abs(ajustado_x) > ZONA_MORTA) {
+            pos_y += (ajustado_x * 5) / 2048;
         }
 
         // Garante que o quadrado permaneça dentro dos limites do display (8x8)
-        if (x_pos < 0) x_pos = 0;
-        if (x_pos > WIDTH - 8) x_pos = WIDTH - 8;
-        if (y_pos < 0) y_pos = 0;
-        if (y_pos > HEIGHT - 8) y_pos = HEIGHT - 8;
+        if (pos_x < 0) pos_x = 0;
+        if (pos_x > LARGURA - 8) pos_x = LARGURA - 8;
+        if (pos_y < 0) pos_y = 0;
+        if (pos_y > ALTURA - 8) pos_y = ALTURA - 8;
 
         // Para o desenho, inverte-se as coordenadas (troca os eixos)
-        int disp_x = y_pos;  // posição horizontal
-        int disp_y = x_pos;  // posição vertical
+        int disp_x = pos_y;  // posição horizontal
+        int disp_y = pos_x;  // posição vertical
 
         // Imprime os valores do joystick e a posição calculada
-        printf("[JOYSTICK] X: %4d | Y: %4d | Pos: (%3d, %3d)\n", x_val, y_val, disp_x, disp_y);
+        printf("[JOYSTICK] X: %4d | Y: %4d | Pos: (%3d, %3d)\n", valor_x, valor_y, disp_x, disp_y);
 
         // --------- Atualiza os níveis dos LEDs via PWM ---------
-        if (pwm_enabled) {
+        if (pwm_ativado) {
             // LED Vermelho: intensidade proporcional ao desvio no eixo X
-            uint32_t red_duty = ((uint32_t)(adjusted_x + 2048) * PWM_WRAP) / 4096;
+            uint32_t duty_vermelho = ((uint32_t)(ajustado_x + 2048) * PWM_WRAP) / 4096;
             // LED Azul: intensidade proporcional ao desvio no eixo Y
-            uint32_t blue_duty = ((uint32_t)(adjusted_y + 2048) * PWM_WRAP) / 4096;
+            uint32_t duty_azul = ((uint32_t)(ajustado_y + 2048) * PWM_WRAP) / 4096;
             // LED Verde: totalmente aceso se estiver ligado (toggle)
-            uint32_t green_duty = green_led_on ? PWM_WRAP : 0;
+            uint32_t duty_verde = led_verde_ligado ? PWM_WRAP : 0;
 
-            pwm_set_gpio_level(LED_RED, red_duty);
-            pwm_set_gpio_level(LED_BLUE, blue_duty);
-            pwm_set_gpio_level(LED_GREEN, green_duty);
+            pwm_set_gpio_level(LED_VERMELHO, duty_vermelho);
+            pwm_set_gpio_level(LED_AZUL, duty_azul);
+            pwm_set_gpio_level(LED_VERDE, duty_verde);
         } else {
-            pwm_set_gpio_level(LED_RED, 0);
-            pwm_set_gpio_level(LED_BLUE, 0);
-            pwm_set_gpio_level(LED_GREEN, 0);
+            pwm_set_gpio_level(LED_VERMELHO, 0);
+            pwm_set_gpio_level(LED_AZUL, 0);
+            pwm_set_gpio_level(LED_VERDE, 0);
         }
 
         // --------- Atualiza o display OLED ---------
-        ssd1306_fill(&ssd, false);
+        ssd1306_fill(&oled, false);
         // Desenha as bordas conforme o estilo selecionado
-        if (border_style == 1) {
-            ssd1306_rect(&ssd, 0, 0, WIDTH, HEIGHT, 1, false);
-        } else if (border_style == 2) {
-            ssd1306_rect(&ssd, 0, 0, WIDTH, HEIGHT, 1, false);
-            ssd1306_rect(&ssd, 1, 1, WIDTH - 2, HEIGHT - 2, 1, false);
-            ssd1306_rect(&ssd, 2, 2, WIDTH - 4, HEIGHT - 4, 1, false);
+        if (estilo_borda == 1) {
+            ssd1306_rect(&oled, 0, 0, LARGURA, ALTURA, 1, false);
+        } else if (estilo_borda == 2) {
+            ssd1306_rect(&oled, 0, 0, LARGURA, ALTURA, 1, false);
+            ssd1306_rect(&oled, 1, 1, LARGURA - 2, ALTURA - 2, 1, false);
+            ssd1306_rect(&oled, 2, 2, LARGURA - 4, ALTURA - 4, 1, false);
         }
         // Desenha o quadrado representando a posição do joystick
-        ssd1306_rect(&ssd, disp_x, disp_y, 8, 8, 1, true);
-        ssd1306_send_data(&ssd);
+        ssd1306_rect(&oled, disp_x, disp_y, 8, 8, 1, true);
+        ssd1306_send_data(&oled);
 
         sleep_ms(20);
     }

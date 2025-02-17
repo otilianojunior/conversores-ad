@@ -17,11 +17,11 @@
 #define ALTURA 64
 
 // Definições do Joystick e Botões
-#define PINO_X_JOYSTICK 26 // ADC0
-#define PINO_Y_JOYSTICK 27 // ADC1
-#define BOTAO_JOYSTICK 22  // Botão do joystick
-#define BOTAO_A 5          // Alterna os PWM dos LEDs
-#define BOTAO_B 6          // Botão para entrar em modo BOOTSEL
+#define PINO_X_JOYSTICK 26
+#define PINO_Y_JOYSTICK 27 
+#define BOTAO_JOYSTICK 22  
+#define BOTAO_A 5         
+#define BOTAO_B 6  
 
 // LEDs RGB (usados via PWM)
 #define LED_VERDE 11
@@ -29,9 +29,9 @@
 #define LED_VERMELHO 13
 
 // Calibração do joystick e zona morta
-#define CENTRO_X_JOYSTICK 1929
-#define CENTRO_Y_JOYSTICK 2019
-#define ZONA_MORTA 100
+#define CENTRO_X_JOYSTICK 1922
+#define CENTRO_Y_JOYSTICK 2025
+#define ZONA_MORTA 60
 
 // Valor de wrap do PWM (12 bits)
 #define PWM_WRAP 4095

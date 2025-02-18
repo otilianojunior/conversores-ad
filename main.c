@@ -8,7 +8,7 @@
 #include "pico/bootrom.h"
 #include "ssd1306.h"
 
-// ==================== Defines ====================
+// ==================== Definições ====================
 #define PORTA_I2C i2c1
 #define SDA_I2C 14
 #define SCL_I2C 15
@@ -42,7 +42,7 @@
 // ==================== Variáveis Globais ====================
 volatile bool pwm_ativado = true;       // Habilita/desabilita os PWM (botão A)
 volatile bool led_verde_ligado = false;   // Estado do LED verde (toggle pelo botão do joystick)
-volatile int estilo_borda = 1;            // 1 ou 2, para alternar o estilo da borda
+volatile int estilo_borda = 1;            // 1, 2 ou 3 para alternar o estilo da borda
 
 // Variáveis para debounce via interrupção
 static absolute_time_t ultimo_tempo_interrupcao_joystick = {0};

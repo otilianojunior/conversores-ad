@@ -1,4 +1,13 @@
-# 💡 Projeto:Conversores na RP2040 - BitDogLab
+<table>
+  <tr>
+    <td>
+      <img src="assets/logo.jpeg" alt="Logo do Projeto" width="150">
+    </td>
+    <td>
+      <h1>💡 Projeto: Conversores na RP2040 - BitDogLab</h1>
+    </td>
+  </tr>
+</table>
 
 ## 📋 Descrição Geral
 
@@ -33,16 +42,15 @@ Este projeto tem como objetivo consolidar os conceitos sobre o uso de **converso
 Joystick_Display/
 ├── assets/
 │   ├── logo.jpeg
-│   ├── display.gif
-│   ├── leds.gif
+│   ├── placa.gif
+│   └── wokwi.gif
 ├── wokwi/
 │   ├── diagram.json
-│   ├── wokwi.toml
+│   └── wokwi.toml
 ├── .gitignore
 ├── CMakeLists.txt
 ├── LICENSE
 ├── main.c
-├── pico_sdk_import.cmake
 └── README.md
 ```
 
@@ -67,6 +75,13 @@ Joystick_Display/
 4. **Configuração Inicial do Joystick:**
    - **Verifique as coordenadas do seu joystick na primeira utilização** e ajuste os valores no código para garantir um funcionamento adequado.
 
+   ```c
+   #define CENTRO_X_JOYSTICK 1922
+   #define CENTRO_Y_JOYSTICK 2025
+   ```
+
+> _Observação:_ O diagrama original da matriz de LEDs foi adaptado a partir do repositório do professor [Wilton Lacerda Silva](https://github.com/wiltonlacerda) e modificado para esta atividade.
+
 ---
 
 ## 🔧 Requisitos Técnicos
@@ -90,7 +105,7 @@ Joystick_Display/
 ### 2. Clonando o Repositório
 
 ```bash
-git clone https://github.com/otilianojunior/Joystick_Display.git
+git clone https://github.com/otilianojunior/conversores-ad.git
 ```
 
 ### 3. Compilação e Envio do Código
@@ -106,15 +121,19 @@ Após a compilação, copie o arquivo `.uf2` gerado para o Raspberry Pi Pico (mo
 
 ### 4. Testes
 
-- **Simulação no Wokwi:** Utilize a plataforma [Wokwi](https://wokwi.com/) para testar o código.
-- **Execução na Placa BitDogLab:** Grave o código no RP2040 e interaja com os botões e joystick.
+- **Simulação no Wokwi:**  
+  <img src="assets/wokwi.gif" width="50%">
+
+- **Execução na Placa BitDogLab:**  
+  Grave o código no RP2040 e interaja com os botões e joystick.  
+  ![Placa](assets/placa.gif)
 
 ---
 
 ## 📁 Entregáveis
 
-- Código-fonte documentado.
-- Vídeo demonstrativo da funcionalidade.
+- Código-fonte presente neste repositório.
+- Vídeo demonstrativo: [Vídeo](https://drive.google.com/file/d/10bey8MsrKD87hNsXohAC1H6DWAOKdtKM/view?usp=sharing)
 
 ---
 
@@ -125,4 +144,3 @@ Este projeto proporciona um excelente aprendizado sobre **ADC, PWM, I2C e interr
 ---
 
 _Desenvolvido por Otiliano Júnior_
-

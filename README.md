@@ -122,18 +122,22 @@ Após a compilação, copie o arquivo `.uf2` gerado para o Raspberry Pi Pico (mo
 ### 4. Testes
 
 - **Simulação no Wokwi:**  
-  <img src="assets/wokwi.gif" width="50%">
+  <p align="center">
+    <img src="assets/wokwi.gif" width="50%">
+  </p>
 
 - **Execução na Placa BitDogLab:**  
   Grave o código no RP2040 e interaja com os botões e joystick.  
-  ![Placa](assets/placa.gif)
+  <p align="center">
+    <img src="assets/placa.gif">
+  </p>
 
 ---
 
 ## 📁 Entregáveis
 
 - Código-fonte presente neste repositório.
-- Vídeo demonstrativo: [Vídeo](https://drive.google.com/file/d/10bey8MsrKD87hNsXohAC1H6DWAOKdtKM/view?usp=sharing)
+- Vídeo demonstrativo: [Vídeo](https://drive.google.com/file/d/1ffY0v1yrHNm2p_ohVFK9X0PiHqzneg3u/view?usp=sharing)
 
 ---
 
